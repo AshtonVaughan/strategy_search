@@ -154,7 +154,7 @@ class StrategySearchOrchestrator:
                 # Get training data with features (before validation week)
                 train_data = self.data_collector.get_training_data_for_week(
                     week_start=week_cfg['start'],
-                    lookback_days=365  # Use all available training data
+                    lookback_days=180  # 6 months of training data (within Yahoo limit)
                 )
 
                 if len(train_data) < 500:  # Need more data for 80+ features
@@ -189,11 +189,7 @@ class StrategySearchOrchestrator:
                 week_start = pd.to_datetime(week_cfg['start'])
                 week_end = week_start + timedelta(days=week_cfg['days'])
 
-                # Make timezone-aware if data index is timezone-aware
-                if self.data.index.tz is not None:
-                    week_start = week_start.tz_localize(self.data.index.tz)
-                    week_end = week_end.tz_localize(self.data.index.tz)
-
+                # Data is timezone-naive now
                 week_data = self.data[(self.data.index >= week_start) & (self.data.index < week_end)]
 
                 if len(week_data) < 10:

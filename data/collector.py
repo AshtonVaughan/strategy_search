@@ -105,6 +105,10 @@ class MultiTimeframeCollector:
             # Keep only OHLCV
             data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
 
+            # Remove timezone to avoid comparison issues
+            if data.index.tz is not None:
+                data.index = data.index.tz_localize(None)
+
             return data
 
         except Exception as e:

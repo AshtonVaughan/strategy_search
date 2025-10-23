@@ -122,7 +122,7 @@ def create_model(config: dict) -> ForexTransformer:
         ForexTransformer model
     """
     return ForexTransformer(
-        input_size=5,  # OHLCV
+        input_size=config.get('input_size', 5),  # Read from config (default 5 for OHLCV)
         hidden_size=config.get('hidden_size', 128),
         num_layers=config.get('num_layers', 2),
         num_heads=config.get('num_heads', 4),

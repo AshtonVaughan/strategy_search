@@ -6,20 +6,21 @@ Searches 1M+ trading strategies over 5-7 days using evolutionary algorithm.
 import yaml
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import torch
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 from tqdm import tqdm
 
 # Import modules
 from search.evolution import EvolutionarySearcher
-from training.trainer import StrategyTrainer, normalize_data
+from training.trainer import StrategyTrainer
 from training.model import create_model
+from training.labeling import SmartLabeler
 from backtesting.engine import MLBacktester, calculate_composite_fitness
-from validation.cross_validator import CrossValidator, get_training_data_for_week
+from validation.cross_validator import CrossValidator
+from data.collector import MultiTimeframeCollector
 
 
 class StrategySearchOrchestrator:
@@ -40,31 +41,36 @@ class StrategySearchOrchestrator:
         self.searcher = EvolutionarySearcher(self.config)
         self.validator = CrossValidator(self.config['validation'])
         self.backtester = MLBacktester(initial_capital=10000)
+        self.data_collector = MultiTimeframeCollector(symbol=self.config['data']['symbol'])
+        self.smart_labeler = SmartLabeler(
+            threshold_pips=self.config.get('labeling', {}).get('threshold_pips', 20),
+            lookforward_hours=self.config.get('labeling', {}).get('lookforward_hours', 12)
+        )
 
-        # Load data
-        print("Loading market data...")
-        self.data = self._load_data()
+        # Load full dataset with features
+        print("Loading multi-timeframe market data with features...")
+        self.data, self.feature_cols = self._load_data()
 
         # Results tracking
         self.all_results = []
         self.best_strategy = None
         self.best_fitness = 0
 
-    def _load_data(self) -> pd.DataFrame:
-        """Load EUR/USD data from Yahoo Finance."""
-        symbol = self.config['data']['symbol']
+    def _load_data(self) -> tuple:
+        """Load multi-timeframe data with features."""
         start = self.config['data']['start_date']
         end = self.config['data']['end_date']
 
-        print(f"Fetching {symbol} from {start} to {end}...")
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(start=start, end=end, interval='1h')
+        # Fetch multi-timeframe data with features
+        data, feature_cols = self.data_collector.prepare_training_data(
+            start_date=start,
+            end_date=end,
+            normalize=True
+        )
 
-        if data.empty:
-            raise ValueError("Failed to load data!")
+        print(f"[OK] Loaded {len(data)} rows with {len(feature_cols)} features")
 
-        print(f"Loaded {len(data)} data points")
-        return data[['Open', 'High', 'Low', 'Close', 'Volume']]
+        return data, feature_cols
 
     def run_search(self):
         """
@@ -132,7 +138,7 @@ class StrategySearchOrchestrator:
 
     def _evaluate_strategy(self, strategy_config: Dict) -> tuple:
         """
-        Evaluate a single strategy configuration.
+        Evaluate a single strategy configuration with new feature pipeline.
 
         Args:
             strategy_config: Strategy configuration
@@ -145,29 +151,43 @@ class StrategySearchOrchestrator:
             week_metrics = []
 
             for week_cfg in self.config['validation']['weeks_config']:
-                # Get training data (before validation week)
-                train_data = get_training_data_for_week(
-                    self.data,
-                    week_cfg,
-                    lookback_days=365
+                # Get training data with features (before validation week)
+                train_data = self.data_collector.get_training_data_for_week(
+                    week_start=week_cfg['start'],
+                    lookback_days=365  # Use all available training data
                 )
 
-                if len(train_data) < 100:
+                if len(train_data) < 500:  # Need more data for 80+ features
+                    print(f"  [WARN] Not enough training data ({len(train_data)} rows), skipping week")
                     continue
 
-                # Normalize
-                normalized_train = normalize_data(train_data.values)
+                # Generate smart labels
+                labeling_method = strategy_config.get('labeling_method', 'forward_return')
+                train_data_labeled, labels = self.smart_labeler.generate_labels(
+                    train_data,
+                    labeling_method=labeling_method
+                )
 
-                # Train model
-                trainer = StrategyTrainer(strategy_config)
-                model = trainer.train_model(
-                    normalized_train,
+                # Check if we have enough labeled samples
+                n_labeled = np.sum(labels != 0)
+                if n_labeled < 50:
+                    print(f"  [WARN] Not enough labeled samples ({n_labeled}), skipping week")
+                    continue
+
+                # Prepare feature matrix
+                feature_matrix = train_data_labeled[self.feature_cols].values
+
+                # Train model with features
+                trainer = StrategyTrainer(strategy_config, input_size=len(self.feature_cols))
+                model = trainer.train_model_with_labels(
+                    features=feature_matrix,
+                    labels=labels,
                     epochs=strategy_config.get('epochs', 20)
                 )
 
-                # Get validation week data
+                # Get validation week data with features
                 week_start = pd.to_datetime(week_cfg['start'])
-                week_end = week_start + pd.Timedelta(days=week_cfg['days'])
+                week_end = week_start + timedelta(days=week_cfg['days'])
 
                 # Make timezone-aware if data index is timezone-aware
                 if self.data.index.tz is not None:
@@ -179,11 +199,13 @@ class StrategySearchOrchestrator:
                 if len(week_data) < 10:
                     continue
 
-                # Generate signals
-                signals = self.backtester.generate_signals(
+                # Generate signals using features
+                signals = self.backtester.generate_signals_with_features(
                     model,
                     week_data,
-                    confidence_threshold=strategy_config['confidence_threshold']
+                    self.feature_cols,
+                    confidence_threshold=strategy_config['confidence_threshold'],
+                    strategy_logic=strategy_config.get('strategy_logic', 'simple')
                 )
 
                 # Backtest
@@ -220,12 +242,15 @@ class StrategySearchOrchestrator:
             print(f"  Sharpe: {aggregated['sharpe_ratio']:.3f} | "
                   f"WinRate: {aggregated['win_rate']:.1%} | "
                   f"MaxDD: {aggregated['max_drawdown']:.1%} | "
+                  f"Trades: {aggregated['total_trades']} | "
                   f"Fitness: {fitness:.4f}")
 
             return fitness, aggregated
 
         except Exception as e:
             print(f"  [ERROR] Error evaluating strategy: {e}")
+            import traceback
+            traceback.print_exc()
             return 0.0, {}
 
     def _save_checkpoint(self, generation: int):

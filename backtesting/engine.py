@@ -93,6 +93,169 @@ class MLBacktester:
 
         return signals_df
 
+    def generate_signals_with_features(
+        self,
+        model,
+        data: pd.DataFrame,
+        feature_cols: list,
+        confidence_threshold: float = 0.70,
+        strategy_logic: str = 'simple'
+    ) -> pd.DataFrame:
+        """
+        Generate trading signals using full feature set and advanced logic.
+
+        Args:
+            model: Trained ML model
+            data: DataFrame with all features
+            feature_cols: List of feature column names
+            confidence_threshold: Minimum confidence to trade
+            strategy_logic: 'simple', 'multi_signal', 'adaptive_threshold', 'trend_confirm'
+
+        Returns:
+            DataFrame with signals (1=buy, -1=sell, 0=hold)
+        """
+        import torch
+
+        # Extract features
+        features = data[feature_cols].values
+
+        # Get model predictions
+        model.eval()
+
+        # Get device from model
+        device = next(model.parameters()).device
+
+        with torch.no_grad():
+            predictions = []
+            confidences = []
+
+            for i in range(len(features)):
+                if i < model.seq_length:
+                    predictions.append(0)
+                    confidences.append(0.5)
+                    continue
+
+                # Get sequence
+                seq = features[i-model.seq_length:i]
+                seq_tensor = torch.FloatTensor(seq).unsqueeze(0).to(device)
+
+                # Predict
+                pred = model(seq_tensor)
+                confidence = torch.sigmoid(pred).item()
+
+                # Apply strategy logic
+                signal = self._apply_strategy_logic(
+                    confidence=confidence,
+                    threshold=confidence_threshold,
+                    data_row=data.iloc[i],
+                    strategy_logic=strategy_logic
+                )
+
+                predictions.append(signal)
+                confidences.append(confidence)
+
+        signals_df = pd.DataFrame({
+            'signal': predictions,
+            'confidence': confidences
+        }, index=data.index)
+
+        return signals_df
+
+    def _apply_strategy_logic(
+        self,
+        confidence: float,
+        threshold: float,
+        data_row: pd.Series,
+        strategy_logic: str
+    ) -> int:
+        """
+        Apply different signal generation logic based on strategy type.
+
+        Args:
+            confidence: Model confidence (0-1)
+            threshold: Confidence threshold
+            data_row: Current data row with all features
+            strategy_logic: Strategy type
+
+        Returns:
+            Signal: 1 (buy), -1 (sell), 0 (hold)
+        """
+        if strategy_logic == 'simple':
+            # Simple: Model prediction only
+            if confidence >= threshold:
+                return 1
+            elif confidence <= (1 - threshold):
+                return -1
+            else:
+                return 0
+
+        elif strategy_logic == 'multi_signal':
+            # Multi-signal: Model + RSI + MACD confirmation
+            rsi = data_row.get('rsi_14', 50)
+            macd_hist = data_row.get('macd_hist', 0)
+
+            # Buy signal
+            if confidence >= threshold:
+                # Confirm with RSI (not overbought) and MACD (positive momentum)
+                if rsi < 70 and macd_hist > 0:
+                    return 1
+
+            # Sell signal
+            elif confidence <= (1 - threshold):
+                # Confirm with RSI (not oversold) and MACD (negative momentum)
+                if rsi > 30 and macd_hist < 0:
+                    return -1
+
+            return 0
+
+        elif strategy_logic == 'adaptive_threshold':
+            # Adaptive: Adjust threshold based on volatility
+            atr = data_row.get('atr_14', 0.0001)
+            hist_vol = data_row.get('hist_volatility', 0.01)
+
+            # Lower threshold in high volatility (more opportunities)
+            # Higher threshold in low volatility (more selective)
+            vol_ratio = hist_vol / 0.01  # Normalize to typical forex volatility
+            adjusted_threshold = threshold * (0.8 + 0.4 * min(vol_ratio, 2))  # 0.8x to 1.2x
+
+            if confidence >= adjusted_threshold:
+                return 1
+            elif confidence <= (1 - adjusted_threshold):
+                return -1
+            else:
+                return 0
+
+        elif strategy_logic == 'trend_confirm':
+            # Trend confirmation: Only trade with trend
+            ema_21 = data_row.get('ema_21', data_row.get('Close', 1.0))
+            ema_50 = data_row.get('ema_50', data_row.get('Close', 1.0))
+            close = data_row.get('Close', 1.0)
+
+            # Uptrend: EMAs aligned up + price above 21 EMA
+            uptrend = (ema_21 > ema_50) and (close > ema_21)
+
+            # Downtrend: EMAs aligned down + price below 21 EMA
+            downtrend = (ema_21 < ema_50) and (close < ema_21)
+
+            # Buy only in uptrend
+            if confidence >= threshold and uptrend:
+                return 1
+
+            # Sell only in downtrend
+            elif confidence <= (1 - threshold) and downtrend:
+                return -1
+
+            return 0
+
+        else:
+            # Unknown strategy, default to simple
+            if confidence >= threshold:
+                return 1
+            elif confidence <= (1 - threshold):
+                return -1
+            else:
+                return 0
+
     def _prepare_features(self, data: pd.DataFrame) -> np.ndarray:
         """
         Prepare OHLCV features for model input.

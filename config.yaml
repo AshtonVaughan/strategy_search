@@ -32,6 +32,21 @@ strategy:
   take_profit_pips: [20, 30, 40, 50, 60]
   trailing_stop: [true, false]
   risk_per_trade: [0.01, 0.02, 0.03]  # 1-3% account risk
+  strategy_logic: ['simple', 'multi_signal', 'adaptive_threshold', 'trend_confirm']
+  # Strategy Logic Types:
+  # - simple: Model prediction only
+  # - multi_signal: Model + RSI + MACD confirmation
+  # - adaptive_threshold: Adjust threshold based on volatility
+  # - trend_confirm: Require trend confirmation from EMAs
+
+# Smart Labeling Configuration
+labeling:
+  threshold_pips: 20  # Minimum move to label (EURUSD)
+  lookforward_hours: 12  # How far ahead to look for target
+  method: 'forward_return'  # forward_return, swing_points, breakout
+  min_atr_multiple: 1.5  # Minimum move relative to ATR
+  filter_noise: true  # Filter low-confidence labels
+  balance_labels: true  # Balance buy/sell samples
 
 # Data Configuration
 data:

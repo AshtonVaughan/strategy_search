@@ -33,6 +33,16 @@ strategy:
   take_profit_pips: [30, 40]
   trailing_stop: [false]
   risk_per_trade: [0.02]
+  strategy_logic: ['simple', 'multi_signal']  # Test only 2 logic types
+
+# Smart Labeling Configuration
+labeling:
+  threshold_pips: 20
+  lookforward_hours: 12
+  method: 'forward_return'
+  min_atr_multiple: 1.5
+  filter_noise: true
+  balance_labels: true
 
 # Data Configuration
 data:

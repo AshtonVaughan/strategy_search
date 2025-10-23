@@ -36,27 +36,27 @@ strategy:
 # Data Configuration
 data:
   symbol: 'EURUSD=X'
-  start_date: '2020-01-01'
+  start_date: '2023-11-01'  # Yahoo hourly limit: ~730 days from today
   end_date: '2025-01-31'
 
-# Cross-Validation: 5 weeks across 5 years
+# Cross-Validation: 5 weeks within available data range
 validation:
   num_weeks: 5
   weeks_config:
-    - year: 2020
-      start: '2020-03-15'  # Covid crash week
-      days: 7
-    - year: 2021
-      start: '2021-07-12'  # Summer trading
-      days: 7
-    - year: 2022
-      start: '2022-02-24'  # Ukraine war
-      days: 7
-    - year: 2023
-      start: '2023-10-18'  # Fall period
+    - year: 2024
+      start: '2024-01-15'  # Q1 2024
       days: 7
     - year: 2024
-      start: '2024-06-03'  # Recent data
+      start: '2024-03-20'  # Q1 end
+      days: 7
+    - year: 2024
+      start: '2024-06-03'  # Q2 2024
+      days: 7
+    - year: 2024
+      start: '2024-09-15'  # Q3 2024
+      days: 7
+    - year: 2024
+      start: '2024-12-01'  # Q4 2024
       days: 7
 
 # Fitness Function Weights (must sum to 1.0)

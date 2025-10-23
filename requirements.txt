@@ -1,0 +1,27 @@
+# Core ML/Training
+torch>=2.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Data
+yfinance>=0.2.0
+ta>=0.11.0  # Technical analysis indicators
+
+# Backtesting (FAST!)
+vectorbt>=0.26.0  # Vectorized backtesting - 100x faster than backtrader
+# Alternative: bt>=0.2.9  # Uncomment if vectorbt has issues
+
+# Search/Optimization
+scipy>=1.10.0
+pyyaml>=6.0
+
+# Terminal UI
+rich>=13.0.0
+tqdm>=4.65.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Utilities
+joblib>=1.3.0

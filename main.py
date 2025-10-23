@@ -177,6 +177,13 @@ class StrategySearchOrchestrator:
                 # Prepare feature matrix
                 feature_matrix = train_data_labeled[self.feature_cols].values
 
+                # Check for NaN/Inf in features BEFORE training
+                if np.isnan(feature_matrix).any() or np.isinf(feature_matrix).any():
+                    n_nan = np.isnan(feature_matrix).sum()
+                    n_inf = np.isinf(feature_matrix).sum()
+                    print(f"  [WARN] Found {n_nan} NaN and {n_inf} Inf in features, cleaning...")
+                    feature_matrix = np.nan_to_num(feature_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+
                 # Train model with features
                 trainer = StrategyTrainer(strategy_config, input_size=len(self.feature_cols))
                 model = trainer.train_model_with_labels(
@@ -293,9 +300,15 @@ class StrategySearchOrchestrator:
         print(f"{'='*70}")
         print(f"Total Strategies Tested: {len(self.all_results)}")
         print(f"Best Fitness: {self.best_fitness:.4f}")
-        print(f"\nBest Strategy Configuration:")
-        for key, value in self.best_strategy.items():
-            print(f"  {key}: {value}")
+
+        if self.best_strategy is not None:
+            print(f"\nBest Strategy Configuration:")
+            for key, value in self.best_strategy.items():
+                print(f"  {key}: {value}")
+        else:
+            print(f"\n[WARN] No successful strategies found!")
+            print(f"  All strategies had fitness 0.0 (likely due to errors)")
+
         print(f"\nFull report saved to: {report_path}")
         print(f"{'='*70}\n")
 

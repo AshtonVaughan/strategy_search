@@ -5,8 +5,15 @@ Handles ML model signal generation + trade execution simulation.
 
 import numpy as np
 import pandas as pd
-import vectorbt as vbt
 from typing import Dict, Tuple, Optional
+
+# Optional: Try to import vectorbt, fall back to simple backtesting if unavailable
+try:
+    import vectorbt as vbt
+    VECTORBT_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: vectorbt not available ({e}). Using simple backtesting fallback.")
+    VECTORBT_AVAILABLE = False
 
 
 class MLBacktester:
@@ -142,33 +149,37 @@ class MLBacktester:
             else:
                 position_sizes.append(0)
 
-        # Use vectorbt Portfolio for fast backtesting
-        try:
-            portfolio = vbt.Portfolio.from_signals(
-                close=data['Close'],
-                entries=entries,
-                exits=exits,
-                init_cash=self.initial_capital,
-                fees=0.0002,  # 2 pips spread
-                slippage=0.0001,  # 1 pip slippage
-            )
+        # Use vectorbt Portfolio for fast backtesting if available
+        if VECTORBT_AVAILABLE:
+            try:
+                portfolio = vbt.Portfolio.from_signals(
+                    close=data['Close'],
+                    entries=entries,
+                    exits=exits,
+                    init_cash=self.initial_capital,
+                    fees=0.0002,  # 2 pips spread
+                    slippage=0.0001,  # 1 pip slippage
+                )
 
-            # Extract metrics
-            metrics = {
-                'total_return': portfolio.total_return(),
-                'sharpe_ratio': portfolio.sharpe_ratio(),
-                'max_drawdown': portfolio.max_drawdown(),
-                'win_rate': portfolio.win_rate(),
-                'total_trades': portfolio.total_trades(),
-                'avg_win': portfolio.winning_trades().avg() if portfolio.winning_trades().count() > 0 else 0,
-                'avg_loss': portfolio.losing_trades().avg() if portfolio.losing_trades().count() > 0 else 0,
-                'profit_factor': portfolio.profit_factor() if portfolio.profit_factor() != np.inf else 0,
-                'final_balance': portfolio.final_value(),
-            }
+                # Extract metrics
+                metrics = {
+                    'total_return': portfolio.total_return(),
+                    'sharpe_ratio': portfolio.sharpe_ratio(),
+                    'max_drawdown': portfolio.max_drawdown(),
+                    'win_rate': portfolio.win_rate(),
+                    'total_trades': portfolio.total_trades(),
+                    'avg_win': portfolio.winning_trades().avg() if portfolio.winning_trades().count() > 0 else 0,
+                    'avg_loss': portfolio.losing_trades().avg() if portfolio.losing_trades().count() > 0 else 0,
+                    'profit_factor': portfolio.profit_factor() if portfolio.profit_factor() != np.inf else 0,
+                    'final_balance': portfolio.final_value(),
+                }
 
-        except Exception as e:
-            # Fallback to simple metrics if vectorbt fails
-            print(f"Vectorbt error: {e}, using fallback")
+            except Exception as e:
+                # Fallback to simple metrics if vectorbt fails
+                print(f"Vectorbt error: {e}, using fallback")
+                metrics = self._simple_backtest(data, signals, sl_price, tp_price)
+        else:
+            # Vectorbt not available, use simple backtest
             metrics = self._simple_backtest(data, signals, sl_price, tp_price)
 
         return metrics

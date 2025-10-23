@@ -1,0 +1,79 @@
+# MINIMAL TEST CONFIGURATION
+# For quick testing - runs in ~10-20 minutes
+
+# Search Settings
+search:
+  total_strategies: 100  # Small for testing
+  days: 1
+  population_size: 4  # Small population
+  generations: 2      # Just 2 generations to test
+  random_sample: 0
+  parallel_models: 1  # Sequential for testing
+
+# Model Architecture Search Space (MINIMAL)
+model:
+  hidden_size: [64, 128]  # Only 2 options
+  num_layers: [2, 4]
+  num_heads: [4]
+  seq_length: [30, 60]
+  dropout: [0.1]
+
+# Training Hyperparameters (MINIMAL)
+training:
+  learning_rate: [0.0003]
+  batch_size: [128]
+  epochs: [10, 20]  # Very short training
+  weight_decay: [0.0001]
+
+# Trading Strategy Parameters (MINIMAL)
+strategy:
+  confidence_threshold: [0.65, 0.70]
+  position_sizing: ['fixed']
+  stop_loss_pips: [15, 20]
+  take_profit_pips: [30, 40]
+  trailing_stop: [false]
+  risk_per_trade: [0.02]
+
+# Data Configuration
+data:
+  symbol: 'EURUSD=X'
+  start_date: '2024-01-01'  # Recent data only (Yahoo hourly limit is 730 days)
+  end_date: '2025-01-31'
+
+# Cross-Validation: Only 2 weeks for testing (recent data)
+validation:
+  num_weeks: 2
+  weeks_config:
+    - year: 2024
+      start: '2024-06-03'
+      days: 7
+    - year: 2024
+      start: '2024-09-15'
+      days: 7
+
+# Fitness Function Weights
+fitness:
+  sharpe_weight: 0.40
+  winrate_weight: 0.30
+  drawdown_weight: 0.30
+  min_trades: 5  # Lower for testing
+
+# Evolutionary Algorithm
+evolution:
+  survival_rate: 0.25
+  mutation_rate: 0.30
+  crossover_rate: 0.50
+  random_rate: 0.25
+
+# System Resources
+resources:
+  device: 'cuda'
+  gpu_memory_gb: 32
+  cpu_cores: 16
+  checkpoint_every: 1  # Save every generation for testing
+
+# Output Settings
+output:
+  save_top_n: 10
+  report_format: 'html'
+  log_level: 'INFO'

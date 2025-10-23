@@ -107,7 +107,7 @@ class StrategySearchOrchestrator:
                 if fitness > self.best_fitness:
                     self.best_fitness = fitness
                     self.best_strategy = strategy_config
-                    print(f"  🏆 NEW BEST! Fitness: {fitness:.4f}")
+                    print(f"  *** NEW BEST! Fitness: {fitness:.4f}")
 
             # Print generation summary
             print(f"\nGeneration {generation + 1} Summary:")
@@ -168,6 +168,12 @@ class StrategySearchOrchestrator:
                 # Get validation week data
                 week_start = pd.to_datetime(week_cfg['start'])
                 week_end = week_start + pd.Timedelta(days=week_cfg['days'])
+
+                # Make timezone-aware if data index is timezone-aware
+                if self.data.index.tz is not None:
+                    week_start = week_start.tz_localize(self.data.index.tz)
+                    week_end = week_end.tz_localize(self.data.index.tz)
+
                 week_data = self.data[(self.data.index >= week_start) & (self.data.index < week_end)]
 
                 if len(week_data) < 10:
@@ -219,7 +225,7 @@ class StrategySearchOrchestrator:
             return fitness, aggregated
 
         except Exception as e:
-            print(f"  ❌ Error evaluating strategy: {e}")
+            print(f"  [ERROR] Error evaluating strategy: {e}")
             return 0.0, {}
 
     def _save_checkpoint(self, generation: int):
@@ -238,7 +244,7 @@ class StrategySearchOrchestrator:
         with open(checkpoint_path, 'w') as f:
             json.dump(checkpoint, f, indent=2)
 
-        print(f"\n✅ Checkpoint saved: {checkpoint_path}")
+        print(f"\n[OK] Checkpoint saved: {checkpoint_path}")
 
     def _generate_report(self):
         """Generate final report of search results."""
@@ -275,12 +281,20 @@ class StrategySearchOrchestrator:
 
 def main():
     """Entry point."""
-    print("Initializing Strategy Search System...")
+    import argparse
 
-    orchestrator = StrategySearchOrchestrator()
+    parser = argparse.ArgumentParser(description='ML Strategy Search System')
+    parser.add_argument('--config', type=str, default='config.yaml',
+                       help='Path to configuration file (default: config.yaml)')
+    args = parser.parse_args()
+
+    print("Initializing Strategy Search System...")
+    print(f"Using config: {args.config}\n")
+
+    orchestrator = StrategySearchOrchestrator(config_path=args.config)
     orchestrator.run_search()
 
-    print("\n🎉 Search complete!")
+    print("\n*** Search complete! ***")
 
 
 if __name__ == "__main__":

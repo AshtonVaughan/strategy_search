@@ -94,6 +94,11 @@ class CrossValidator:
         start = pd.to_datetime(week_cfg['start'])
         end = start + timedelta(days=week_cfg['days'])
 
+        # Make timezone-aware if data index is timezone-aware
+        if data.index.tz is not None:
+            start = start.tz_localize(data.index.tz)
+            end = end.tz_localize(data.index.tz)
+
         # Get data for this week
         week_data = data[(data.index >= start) & (data.index < end)]
 
@@ -174,6 +179,12 @@ def get_training_data_for_week(
     week_start = pd.to_datetime(week_cfg['start'])
     train_end = week_start - timedelta(days=1)  # Day before validation week
     train_start = train_end - timedelta(days=lookback_days)
+
+    # Make timezone-aware if data index is timezone-aware
+    if data.index.tz is not None:
+        week_start = week_start.tz_localize(data.index.tz)
+        train_end = train_end.tz_localize(data.index.tz)
+        train_start = train_start.tz_localize(data.index.tz)
 
     train_data = data[(data.index >= train_start) & (data.index <= train_end)]
 

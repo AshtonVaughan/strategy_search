@@ -211,6 +211,11 @@ class StrategySearchOrchestrator:
                     strategy_logic=strategy_config.get('strategy_logic', 'simple')
                 )
 
+                # Debug: Check signals
+                n_buy = (signals['signal'] == 1).sum()
+                n_sell = (signals['signal'] == -1).sum()
+                print(f"  Signals: {n_buy} buys, {n_sell} sells")
+
                 # Backtest
                 metrics = self.backtester.backtest(
                     week_data,
@@ -220,6 +225,9 @@ class StrategySearchOrchestrator:
                     risk_per_trade=strategy_config['risk_per_trade'],
                     trailing_stop=strategy_config.get('trailing_stop', False)
                 )
+
+                # Debug: Check metrics
+                print(f"  Trades: {metrics.get('total_trades', 0)}, WinRate: {metrics.get('win_rate', 0):.1%}")
 
                 week_metrics.append(metrics)
 

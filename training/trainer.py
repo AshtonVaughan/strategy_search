@@ -71,6 +71,11 @@ class StrategyTrainer:
                 predictions = model(batch_X)
                 loss = criterion(predictions, batch_y)
 
+                # Check for NaN loss
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"  [WARN] NaN/Inf loss detected, skipping batch")
+                    continue
+
                 # Backward pass
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -152,6 +157,11 @@ class StrategyTrainer:
                 optimizer.zero_grad()
                 predictions = model(batch_X)
                 loss = criterion(predictions, batch_y)
+
+                # Check for NaN loss
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"  [WARN] NaN/Inf loss detected, skipping batch")
+                    continue
 
                 # Backward pass
                 loss.backward()

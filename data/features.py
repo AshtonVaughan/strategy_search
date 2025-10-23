@@ -54,7 +54,11 @@ class FeatureEngine:
         df = self._add_derived_features(df)
 
         # Fill NaN values (forward fill then backward fill)
-        df = df.fillna(method='ffill').fillna(method='bfill')
+        df = df.ffill().bfill()
+
+        # Replace any remaining NaN/Inf with 0 (safety)
+        df = df.replace([np.inf, -np.inf], 0)
+        df = df.fillna(0)
 
         return df
 

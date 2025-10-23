@@ -4,6 +4,7 @@ Fetches 1H and 4H data, aligns timeframes, and merges for context.
 """
 
 import pandas as pd
+import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, Tuple
@@ -179,7 +180,11 @@ class MultiTimeframeCollector:
         merged = pd.concat([data_1h, data_4h_aligned], axis=1)
 
         # Fill any remaining NaN
-        merged = merged.fillna(method='ffill').fillna(method='bfill')
+        merged = merged.ffill().bfill()
+
+        # Replace any remaining NaN/Inf with 0 (safety)
+        merged = merged.replace([np.inf, -np.inf], 0)
+        merged = merged.fillna(0)
 
         return merged
 

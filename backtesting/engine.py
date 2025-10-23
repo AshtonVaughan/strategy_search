@@ -53,6 +53,10 @@ class MLBacktester:
 
         # Get model predictions
         model.eval()
+
+        # Get device from model
+        device = next(model.parameters()).device
+
         with torch.no_grad():
             predictions = []
             confidences = []
@@ -65,7 +69,7 @@ class MLBacktester:
 
                 # Get sequence
                 seq = features[i-model.seq_length:i]
-                seq_tensor = torch.FloatTensor(seq).unsqueeze(0)
+                seq_tensor = torch.FloatTensor(seq).unsqueeze(0).to(device)
 
                 # Predict
                 pred = model(seq_tensor)
